@@ -1,10 +1,26 @@
 import { NextResponse } from "next/server";
-
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+import Stripe from "stripe";
 
 export async function POST(req: Request) {
+  // Instantiate Stripe inside the handler so the module doesn't throw at build time
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    console.error("Missing STRIPE_SECRET_KEY environment variable");
+    return NextResponse.json(
+      { error: "Server configuration error: missing STRIPE_SECRET_KEY" },
+      { status: 500 }
+    );
+  }
+
+  const stripe = new Stripe(stripeKey, { apiVersion: "2022-11-15" });
+
   try {
-    const { priceId, planName, email } = await req.json();
+    const body = await req.json();
+    const { priceId, planName, email } = body || {};
+
+    if (!priceId) {
+      return NextResponse.json({ error: "Missing priceId in request body" }, { status: 400 });
+    }
 
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({
